@@ -377,20 +377,20 @@ end;
 title('Ground truth');
 set(gcf,'position',[50,450,400,300]);
 
-try
-labels=dbscan_daszykowski(samples',4,[])';
-figure;
-for j=1:max(labels)
-	xx=samples(1,labels==j);
-	yy=samples(2,labels==j);
-	col=colors(mod(j-1,length(colors))+1);
-	plot(xx,yy,['.',col]);
-	if (j==1) hold on; end;
-end;
-title('dbscan'); set(gcf,'position',[50,0,400,300]);
-catch
-	warning('Unable to run dbscan_daszykowski');
-end;
+% try
+% labels=dbscan_daszykowski(samples',4,[])';
+% figure;
+% for j=1:max(labels)
+% 	xx=samples(1,labels==j);
+% 	yy=samples(2,labels==j);
+% 	col=colors(mod(j-1,length(colors))+1);
+% 	plot(xx,yy,['.',col]);
+% 	if (j==1) hold on; end;
+% end;
+% title('dbscan'); set(gcf,'position',[50,0,400,300]);
+% catch
+% 	warning('Unable to run dbscan_daszykowski');
+% end;
 
 labels=local_kmeans_sorber(samples,length(centers));
 figure;
