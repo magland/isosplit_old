@@ -16,7 +16,8 @@ function [labels,info]=isosplit(X,opts)
 % Magland 5/19/2015
 
 if (nargin<1)
-	isosplit_test; %run the test code if there are no parameters
+	%isosplit_test; %run the test code if there are no parameters
+    isosplit_iteration_demo;
 	return;
 end;
 
@@ -36,6 +37,7 @@ if (~isfield(opts,'minsize')) opts.minsize=3; end;
 if (~isfield(opts,'verbose')) opts.verbose=0; end;
 if (~isfield(opts,'verbose2')) opts.verbose2=0; end;
 if (~isfield(opts,'max_iterations_per_number_clusters')) opts.max_iterations_per_number_clusters=5000; end;
+if (~isfield(opts,'return_iterations')) opts.return_iterations=0; end;
 
 [M,N]=size(X);
 
@@ -50,6 +52,8 @@ distances=compute_distances(centroids);
 %Here is a list of the attempted cluster splits/redistributions -- we don't
 %ever want to repeat any of these.
 attempted_redistributions=zeros(0,1);
+
+if (opts.return_iterations) info.iterations={}; end;
 
 info.num_iterations=0;
 num_iterations_with_same_number_of_clusters=0;
@@ -114,6 +118,7 @@ while true
 			centroids(:,label2)=0;
 		end;
 		[labels,centroids,distances]=normalize_labels(labels,centroids,distances); % we may have eliminated a label, so let's shift the labelings down
+        if (opts.return_iterations) info.iterations{end+1}=labels; end;
 	else
 		distances(label1,label2)=inf;
 		distances(label2,label1)=inf;
@@ -332,6 +337,81 @@ end
 
 end
 
+function isosplit_iteration_demo
+
+close all;
+
+seed0=randi(10000);
+seed0=6239;
+rng(seed0);
+centers={[0,0],[5,3.8],[-4.5,3]};
+pops={1000,800,400};
+shapes={[1,1,0],[2,1,0],[1,2,0]};
+opts.split_threshold=0.3;
+opts.K=25;
+opts.return_iterations=1;
+
+fprintf('seed = %d\n',seed0);
+
+samples=zeros(2,0);
+true_labels=zeros(1,0);
+
+for j=1:length(centers)
+	xx=randn(1,pops{j});
+	yy=randn(1,pops{j});
+	shape=shapes{j};
+	xx2=xx*shape(1)+yy*shape(3);
+	yy2=yy*shape(2)-xx*shape(3);
+	center=centers{j};
+	xx2=xx2+center(1);
+	yy2=yy2+center(2);
+	tmp=zeros(2,pops{j});
+	tmp(1,:)=xx2; tmp(2,:)=yy2;
+	samples=[samples,tmp];
+	true_labels=[true_labels,ones(1,pops{j})*j];
+end;
+
+colors='rgbkymc';
+[labels,info]=isosplit(samples,opts);
+fprintf('num clusters = %d\n',max(labels));
+
+
+
+
+%# figure
+
+
+
+
+fprintf('seed = %d\n',seed0);
+fA=figure; set(fA,'position',[200,200,700,700]);
+figure, set(fA, 'Color','white')
+for ii=1:length(info.iterations)
+    figure(fA);
+    labels0=info.iterations{ii};
+    for j=1:max(labels0)
+        xx=samples(1,labels0==j);
+        yy=samples(2,labels0==j);
+        col=colors(mod(j-1,length(colors))+1);
+        plot(xx,yy,['.',col],'markersize',8);
+
+        if (j==1) hold on; end;
+    end
+    f = getframe(gca); f0=f;
+    if (ii==1)
+        set(gca, 'nextplot','replacechildren', 'Visible','off');
+        [f,map] = rgb2ind(f.cdata, 256, 'nodither');
+        mov = repmat(f, [1 1 1 length(info.iterations)]);
+    end;
+    mov(:,:,1,ii) = rgb2ind(f0.cdata, map, 'nodither');
+    
+    pause(0.01);
+end;
+
+imwrite(mov, map, 'test.gif', 'DelayTime',0.3, 'LoopCount',0);
+
+end
+
 function isosplit_test
 	
 close all;
@@ -403,7 +483,7 @@ for j=1:max(labels)
 end;
 title('kmeans'); set(gcf,'position',[500,0,400,300]);
 
-labels=isosplit(samples,opts);
+[labels,info]=isosplit(samples,opts);
 figure;
 for j=1:max(labels)
 	xx=samples(1,labels==j);
