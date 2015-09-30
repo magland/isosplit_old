@@ -408,7 +408,7 @@ for ii=1:length(info.iterations)
     pause(0.01);
 end;
 
-imwrite(mov, map, 'test.gif', 'DelayTime',0.3, 'LoopCount',0);
+imwrite(mov, map, 'isosplit_demo.gif', 'DelayTime',0.8, 'LoopCount',0);
 
 end
 
