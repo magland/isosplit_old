@@ -394,7 +394,6 @@ for ii=1:length(info.iterations)
         yy=samples(2,labels0==j);
         col=colors(mod(j-1,length(colors))+1);
         plot(xx,yy,['.',col],'markersize',8);
-
         if (j==1) hold on; end;
     end
     f = getframe(gca); f0=f;
@@ -403,12 +402,13 @@ for ii=1:length(info.iterations)
         [f,map] = rgb2ind(f.cdata, 256, 'nodither');
         mov = repmat(f, [1 1 1 length(info.iterations)]);
     end;
-    mov(:,:,1,ii) = rgb2ind(f0.cdata, map, 'nodither');
+    % seems to be a problem
+    %mov(:,:,1,ii) = rgb2ind(f0.cdata, map, 'nodither');
     
-    pause(0.01);
+    pause(0.8);
 end;
 
-imwrite(mov, map, 'isosplit_demo.gif', 'DelayTime',0.8, 'LoopCount',0);
+%imwrite(mov, map, 'isosplit_demo.gif', 'DelayTime',0.8, 'LoopCount',0);
 
 end
 
