@@ -1,4 +1,21 @@
 function [labels,info]=isosplit5(X,opts)
+% isosplit5 - perform clustering using isotonic regression (jfm, may 2015 - dec 2016)
+%
+% labels = isosplit5(X,opts) 
+%   X is M x N, M=#dimensions, N=#samples
+%   labels: 1xN vector of labels from 1..K,  K = # clusters
+%
+%   opts.isocut_threshold -- threshold for determining isocut tests
+%   opts.min_cluster_size -- minimum cluster size
+%   opts.K_init -- number of clusters in initial parcelation
+%   opts.refine_clusters -- whether to recursively apply isosplit to refine
+%        clusters
+%   opts.max_iterations -- maximum number of iterations before stopping
+%   opts.verbose
+%   opts.verbose_pause_duration
+%   opts.whiten_cluster_pairs -- whether to whiten at each comparison
+%
+% Magland 5/19/2015, updated dec 2016
 
 %% Default parameters and self test
 if nargin<1, test_isosplit5; return; end;
