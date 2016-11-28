@@ -1,0 +1,11 @@
+ISO-SPLIT
+Author: Jeremy Magland
+See COPYRIGHT notice
+
+First compile the mex file
+>> mex jisotonic_mex.cpp
+
+Then test the program
+>> isosplit
+
+See isosplit.m for usage information

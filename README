@@ -2,10 +2,15 @@ ISO-SPLIT
 Author: Jeremy Magland
 See COPYRIGHT notice
 
-First compile the mex file
->> mex jisotonic_mex.cpp
+Open Matlab
 
-Then test the program
->> isosplit
+First compile the mex files
+>> compile_mex_isocut5
+>> compile_mex_isosplit5
+>> compile_mex_jisotonic5
 
-See isosplit.m for usage information
+Then test the functions
+>> isosplit5
+>> isocut5
+
+See isosplit5.m for usage information
