@@ -14,6 +14,7 @@ function [labels,info]=isosplit5(X,opts)
 %   opts.verbose
 %   opts.verbose_pause_duration
 %   opts.whiten_cluster_pairs -- whether to whiten at each comparison
+%   opts.initial_labels -- optional -- if provided will skip the parcelation step
 %
 % Magland 5/19/2015, updated dec 2016
 
@@ -24,10 +25,15 @@ if ~isfield(opts,'isocut_threshold') opts.isocut_threshold=1; end;
 if ~isfield(opts,'min_cluster_size') opts.min_cluster_size=10; end;
 if ~isfield(opts,'K_init') opts.K_init=200; end;
 if ~isfield(opts,'refine_clusters'), opts.refine_clusters=true; end;
-if ~isfield(opts,'max_iterations'), opts.max_iterations_per_pass=500; end;
+if ~isfield(opts,'max_iterations_per_pass'), opts.max_iterations_per_pass=500; end;
 if ~isfield(opts,'verbose') opts.verbose=0; end;
+if ~isfield(opts,'verbose_isocut') opts.verbose_isocut=0; end;
 if ~isfield(opts,'verbose_pause_duration') opts.verbose_pause_duration=0.5; end;
 if ~isfield(opts,'whiten_cluster_pairs') opts.whiten_cluster_pairs=1; end;
+if ~isfield(opts,'initial_labels') opts.initial_labels=[]; end;
+if ~isfield(opts,'prevent_merge') opts.prevent_merge=false; end;
+if ~isfield(opts,'one_comparison_at_a_time') opts.one_comparison_at_a_time=false; end; % for verbose=1
+if ~isfield(opts,'return_iterations') opts.return_iterations=0; end;
 
 %% Initialize the timers for diagnostic
 timers.get_pairs_to_compare=0;
@@ -35,14 +41,34 @@ timers.compare_pairs=0;
 timers.compute_centers=0;
 
 [M,N]=size(X);
+info=struct;
+if (opts.return_iterations)
+    info.iterations={};
+end;
 
 %% Compute the initial clusters
-target_parcel_size=opts.min_cluster_size;
-target_num_parcels=opts.K_init;
-% !! important not to do a final reassign because then the shapes will not
-% be conducive to isosplit iterations -- hexagons are not good for isosplit!
-data.labels=parcelate2(X,target_parcel_size,target_num_parcels,struct('final_reassign',0));
-Kmax=max(data.labels);
+if (isempty(opts.initial_labels))
+    target_parcel_size=opts.min_cluster_size;
+    target_num_parcels=opts.K_init;
+    % !! important not to do a final reassign because then the shapes will not
+    % be conducive to isosplit iterations -- hexagons are not good for isosplit!
+    data.labels=parcelate2(X,target_parcel_size,target_num_parcels,struct('final_reassign',0));
+    Kmax=max(data.labels);
+else
+    data.labels=opts.initial_labels;
+    Kmax=max(data.labels);
+    inds0=find(data.labels==0);
+    if (~isempty(inds0))
+        inds1=find(data.labels>0);
+        if (~isempty(inds1))
+            idx1=knnsearch(X(:,inds1)',X(:,inds0)');
+            data.labels(inds0)=data.labels(inds1(idx1));
+        else
+            data.labels(inds0)=1;
+        end;
+    end;
+end;
+
 
 %debug
 %labels=data.labels;
@@ -52,6 +78,11 @@ Kmax=max(data.labels);
 ttt=tic;
 data.centers=compute_centers(X,data.labels);
 timers.compute_centers=timers.compute_centers+toc(ttt);
+
+if (opts.verbose)
+    fA=figure;
+    info.frames={};
+end;
 
 %% Repeat while something has been merged in the pass
 final_pass=false; % plus we do one final pass at the end
@@ -77,7 +108,7 @@ while 1 % Passes
         % These will be closest pairs of active clusters that have not yet
         % been compared in this pass
         ttt=tic;
-        [inds1,inds2]=get_pairs_to_compare(active_centers,data.comparisons_made(active_labels,active_labels));
+        [inds1,inds2]=get_pairs_to_compare(active_centers,data.comparisons_made(active_labels,active_labels),opts);
         timers.get_pairs_to_compare=timers.get_pairs_to_compare+toc(ttt);
 
         % If we didn't find any, break from this iteration
@@ -85,13 +116,45 @@ while 1 % Passes
             % Nothing else to compare.
             break;
         end;
+        
+        % Show the clusters if we are in verbose mode
+        if (opts.verbose)
+%             labels_map=zeros(1,Kmax);
+%             active_labels_vec=zeros(1,Kmax);
+%             active_labels_vec(data.labels)=1;
+%             active_labels=find(active_labels_vec);
+%             for ii=1:length(active_labels)
+%                 labels_map(active_labels(ii))=ii;
+%             end;
+%             labels_mapped=labels_map(data.labels);
+            ooo.draw_axes=false;
+            ooo.draw_legend=false;
+            if (length(unique(data.labels))<=10)
+                ooo.draw_legend=true;
+            end;
+            figure(fA); ms_view_clusters_0(X(:,:),data.labels,ooo);
+            %title(sprintf('iteration %d',iteration_number));
+            set(gca,'xtick',[]); set(gca,'ytick',[]);
+            pause(opts.verbose_pause_duration);
+            info.frames{end+1}=getframe;
+        end;
+        
         old_labels=data.labels; % So we can determine the number of label changes for diagnostics
 
         % Actually compare the pairs -- in principle this operation could be parallelized
         ttt=tic;
-        [data.labels,clusters_changed]=compare_pairs(X,data.labels,active_labels(inds1),active_labels(inds2),opts);
+        [data.labels,clusters_changed,compare_pairs_info]=compare_pairs(X,data.labels,active_labels(inds1),active_labels(inds2),opts);
         clusters_changed_vec_in_pass(clusters_changed)=1;
         timers.compare_pairs=timers.compare_pairs+toc(ttt);
+        
+        if (opts.return_iterations)
+            AA.pairs_to_compare_1=active_labels(inds1);
+            AA.pairs_to_compare_2=active_labels(inds2);
+            AA.old_labels=old_labels;
+            AA.new_labels=data.labels;
+            AA.compare_pairs_info=compare_pairs_info;
+            info.iterations{end+1}=AA;
+        end;
 
         % Update which comparisons have been made
         for j=1:length(inds1)
@@ -113,23 +176,6 @@ while 1 % Passes
         new_active_labels=find(new_active_labels_vec);
         if (length(new_active_labels)<length(active_labels))
             something_merged=1;
-        end;
-
-        % Show the clusters if we are in verbose mode
-        if (opts.verbose)&&(length(clusters_changed)>0)
-            if (length(new_active_labels)<50)
-                labels_map=zeros(1,Kmax);
-                active_labels_vec=zeros(1,Kmax);
-                active_labels_vec(data.labels)=1;
-                active_labels=find(active_labels_vec);
-                for ii=1:length(active_labels)
-                    labels_map(active_labels(ii))=ii;
-                end;
-                labels_mapped=labels_map(data.labels);
-                figure; ms_view_clusters_0(X(:,:),labels_mapped);
-                title(sprintf('iteration %d',iteration_number));
-                pause(opts.verbose_pause_duration);
-            end;
         end;
         
         %break;
@@ -167,6 +213,7 @@ info.timers=timers;
 % of the new clusters, recursively. Unless we only found one cluster.
 if ((opts.refine_clusters)&&(max(labels)>1))
     opts2=opts;
+    opts2.initial_labels=[];
     opts2.refine_clusters=true; % Maybe we should provide an option on whether to do recursive refinement
     K=max(labels);
     labels_split=zeros(1,N);
@@ -188,7 +235,11 @@ for m=1:M
 end;
 centers(:,find(counts))=centers(:,find(counts))./repmat(counts(find(counts)),M,1);
 
-function [new_labels,clusters_changed]=compare_pairs(X,labels,k1s,k2s,opts)
+function [new_labels,clusters_changed,info]=compare_pairs(X,labels,k1s,k2s,opts)
+info=struct;
+if (opts.return_iterations)
+    info.merge_tests={};
+end;
 clusters_changed_vec=zeros(1,max(labels));
 new_labels=labels;
 for i1=1:length(k1s)
@@ -202,12 +253,27 @@ for i1=1:length(k1s)
         else
             inds12=cat(2,inds1,inds2);
             L12_old=cat(2,ones(1,length(inds1)),2*ones(1,length(inds2)));
-            [do_merge,L12,proj]=merge_test(X(:,inds1),X(:,inds2),opts);
+            [do_merge,L12,proj,cutpoint]=merge_test(X(:,inds1),X(:,inds2),opts);
+            if (opts.return_iterations)
+                MM.do_merge=do_merge;
+                MM.L12=L12;
+                MM.proj=proj;
+                MM.cutpoint=cutpoint;
+                MM.k1=k1;
+                MM.k2=k2;
+                info.merge_tests{end+1}=MM;
+            end;
+            
+            if (opts.verbose_isocut)
+                title(sprintf('Compare %d %d',k1,k2));
+            end;
         end;
         if (do_merge)
-            new_labels(find(new_labels==k2))=k1;
-            clusters_changed_vec(k1)=1;
-            clusters_changed_vec(k2)=1;
+            if (~opts.prevent_merge)
+                new_labels(find(new_labels==k2))=k1;
+                clusters_changed_vec(k1)=1;
+                clusters_changed_vec(k2)=1;
+            end;
         else
             %redistribute
             new_labels(inds12(find(L12==1)))=k1;
@@ -235,11 +301,14 @@ X2_centered=X2-repmat(centroid2,1,N2);
 C1=(X1_centered*X1_centered')/N1;
 C2=(X2_centered*X2_centered')/N2;
 avg_cov=(C1+C2)/2;
-inv_avg_cov=inv(avg_cov);
+
 X1b=X1;
 X2b=X2;
 V=centroid2-centroid1;
-V=inv_avg_cov*V;
+if (abs(det(avg_cov))>1e-6)
+    inv_avg_cov=inv(avg_cov);
+    V=inv_avg_cov*V;
+end;
 V=V/sqrt(V'*V);
 
 function [X1b,X2b,V]=whiten_two_clusters(X1,X2)
@@ -275,7 +344,7 @@ centroid1b=mean(X1b,2);
 centroid2b=mean(X2b,2);
 V=centroid2b-centroid1b;
 
-function [ret,new_labels,projection12]=merge_test(X1_in,X2_in,opts)
+function [do_merge,new_labels,projection12,cutpoint]=merge_test(X1_in,X2_in,opts)
 if opts.whiten_cluster_pairs
     [X1,X2,V]=whiten_two_clusters_b(X1_in,X2_in);
 else
@@ -296,7 +365,10 @@ projection1=V'*X1;
 projection2=V'*X2;
 projection12=cat(2,projection1,projection2);
 [dipscore,cutpoint]=isocut5(projection12,ones(size(projection12)));
-ret=(dipscore<opts.isocut_threshold);
+do_merge=(dipscore<opts.isocut_threshold);
+if (opts.verbose_isocut)
+    figure; view_isocut_hist(projection12,do_merge,cutpoint);
+end;
 %cutpoint=isocut(projection12,opts.isocut_threshold);
 %ret=(cutpoint~=0);
 new_labels=ones(1,N1+N2);
@@ -311,10 +383,11 @@ for m=1:M
 end;
 dists=sqrt(dists);
 
-function [inds1,inds2]=get_pairs_to_compare(centers,comparisons_made)
+function [inds1,inds2]=get_pairs_to_compare(centers,comparisons_made,opts)
 [M,N]=size(centers);
 inds1=[];
 inds2=[];
+pair_dists=[];
 dists=make_dists_matrix(centers);
 dists(find(comparisons_made(:)))=inf;
 for j=1:N
@@ -331,6 +404,7 @@ end;
                 if (dists(j,best_inds(j))<inf)
                     inds1(end+1)=j;
                     inds2(end+1)=best_inds(j);
+                    pair_dists(end+1)=dists(j,best_inds(j));
                     dists(j,:)=inf;
                     dists(:,j)=inf;
                     dists(best_inds(j),:)=inf;
@@ -341,6 +415,33 @@ end;
         end;        
     end;
 %end;
+
+if (opts.one_comparison_at_a_time)
+    if (length(inds1)>0)
+        [~,ii]=min(pair_dists); ii=ii(1);
+        inds1=inds1(ii);
+        inds2=inds2(ii);
+    end;
+end;
+
+function view_isocut_hist(X,do_merge,cutpoint)
+if (do_merge)
+    inds1=1:length(X);
+    inds2=[];
+else
+    inds1=find(X<cutpoint);
+    inds2=find(X>=cutpoint);
+end;
+[counts,bins]=hist(X,ceil(length(X)/10));
+counts1=hist(X(inds1),bins);
+counts2=hist(X(inds2),bins);
+bar(bins,counts,1,'FaceColor',[0.8,0.8,0.8],'EdgeColor',[0.8,0.8,0.8]);
+hold on;
+bar(bins,counts1,1,'FaceColor',[0.3,0.3,0.3],'EdgeColor',[0.3,0.3,0.3]);
+bar(bins,counts2,1,'FaceColor',[0.6,0.6,0.6],'EdgeColor',[0.6,0.6,0.6]);
+hold off;
+set(gca,'xtick',[]);
+set(gca,'ytick',[]);
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 function [X,labels]=create_multimodal_nd(A)
@@ -396,7 +497,7 @@ figure; ms_view_clusters_0(X(1:2,:),true_labels);
 title('Truth');
 
 ttt=tic;
-[labels2,info]=isosplit5(X,struct('verbose',0,'refine_clusters',0,'whiten_cluster_pairs',1));
+[labels2,info]=isosplit5(X,struct('verbose',1,'refine_clusters',0,'whiten_cluster_pairs',1));
 fprintf('Time for isosplit5: %g\n',toc(ttt));
 figure; ms_view_clusters_0(X(1:2,:),labels2);
 title('isosplit5');
@@ -414,4 +515,3 @@ labels_mex=isosplit5_mex(X);
 fprintf('Time for isosplit5_mex: %g\n',toc(ttt));
 figure; ms_view_clusters_0(X(1:2,:),labels_mex);
 title('isosplit5 mex');
-

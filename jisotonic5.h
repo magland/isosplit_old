@@ -6,9 +6,13 @@
 #ifndef jisotonic5_h
 #define jisotonic5_h
 
-void jisotonic5(int N, float* BB, float* MSE, float* AA, float* WW);
-void jisotonic5_updown(int N, float* out, float* in, float* weights);
-void jisotonic5_downup(int N, float* out, float* in, float* weights);
-void jisotonic5_sort(int N, float* out, const float* in);
+#include <stdlib.h>
+
+typedef int64_t bigint;
+
+void jisotonic5(bigint N, float* BB, float* MSE, float* AA, float* WW);
+void jisotonic5_updown(bigint N, float* out, float* in, float* weights);
+void jisotonic5_downup(bigint N, float* out, float* in, float* weights);
+void jisotonic5_sort(bigint N, float* out, const float* in);
 
 #endif

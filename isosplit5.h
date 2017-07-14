@@ -1,6 +1,9 @@
 #ifndef ISOSPLIT5_H
 #define ISOSPLIT5_H
 
+//#include "mlcommon.h"
+#include "isocut5.h"
+
 struct isosplit5_opts {
     float isocut_threshold = 1.0;
     int min_cluster_size = 10;
@@ -9,7 +12,7 @@ struct isosplit5_opts {
     int max_iterations_per_pass = 500;
 };
 
-void isosplit5(int* labels_out, int M, long N, float* X, isosplit5_opts opts);
+bool isosplit5(int* labels_out, bigint M, bigint N, float* X, isosplit5_opts opts);
 
 /*
  * MCWRAP [ labels_out[1,N] ] = isosplit5_mex(X[M,N])

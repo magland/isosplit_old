@@ -47,7 +47,7 @@ void mexFunction(int nlhs, mxArray* plhs[], int nrhs, const mxArray* prhs[])
         }
         const mwSize* dims2 = mxGetDimensions(prhs[1 - 1]);
         int dims[] = { 1, input_N };
-        for (long ii = 0; ii < numdims; ii++) {
+        for (int ii = 0; ii < numdims; ii++) {
             if (dims[ii] != dims2[ii]) {
                 mexErrMsgTxt("Incorrect size of input: samples");
             }
@@ -65,7 +65,7 @@ void mexFunction(int nlhs, mxArray* plhs[], int nrhs, const mxArray* prhs[])
         }
         {
             int dims2[] = { 1, 1 };
-            for (long ii = 0; ii < 2; ii++) {
+            for (int ii = 0; ii < 2; ii++) {
                 if ((dims2[ii] < 1) || (dims2[ii] > 10000000000.0)) {
                     mexErrMsgTxt("Bad array size for my taste: 1,1");
                 }
@@ -84,7 +84,7 @@ void mexFunction(int nlhs, mxArray* plhs[], int nrhs, const mxArray* prhs[])
         }
         {
             int dims2[] = { 1, 1 };
-            for (long ii = 0; ii < 2; ii++) {
+            for (int ii = 0; ii < 2; ii++) {
                 if ((dims2[ii] < 1) || (dims2[ii] > 10000000000.0)) {
                     mexErrMsgTxt("Bad array size for my taste: 1,1");
                 }
